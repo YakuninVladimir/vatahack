@@ -1,6 +1,6 @@
+from sentence_transformers import SentenceTransformer  # type: ignore
 class E5Embedder:
     def __init__(self, model_name: str = "intfloat/multilingual-e5-small", device: str = "cpu"):
-        from sentence_transformers import SentenceTransformer  # type: ignore
 
         self._model = SentenceTransformer(model_name, device=device)
 

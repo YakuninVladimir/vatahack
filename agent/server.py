@@ -1,3 +1,5 @@
+import traceback
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -37,7 +39,9 @@ def analyze(req: AnalyzeRequest) -> dict[str, dict[str, str]]:
         extractor = ThemesExtractor(min_topic_size=req.min_topic_size, include_noise=req.include_noise)
         grouped = extractor(messages)  # dict[str, list[Message]]
 
-        builder = SummaryBuilder(model=req.ollama_model, context_window_tokens=req.context_window_tokens)
+        builder = SummaryBuilder(model=req.ollama_model, context_window_tokens=req.context_window_tokens, verbose=True)
+        builder = SummaryBuilder(model=req.ollama_model, context_window_tokens=req.context_window_tokens, verbose=False)
         return builder(grouped)  # dict[str, {"theme": str, "summary": str}]
     except Exception as e:
+        traceback.print_exception(e)
         raise HTTPException(status_code=500, detail=str(e)) from e

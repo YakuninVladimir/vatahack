@@ -4,8 +4,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, StateGraph
+from tqdm import tqdm
 
 from agent import Message
+from agent.stream_callback import StreamToStdoutWithTPS
 from agent.chains import build_reduce_chain, build_summarize_chain, build_theme_chain
 
 def _default_token_counter(llm: ChatOllama) -> Callable[[str], int]:
@@ -92,7 +94,6 @@ def _chunk_by_tokens(text: str, token_count: Callable[[str], int], max_tokens: i
 
     return chunks
 
-
 class SummaryBuilder:
     """
     Input:  dict[theme_key -> list[Message]]  (theme_key ~= "k1 / k2 / k3")
@@ -106,13 +107,34 @@ class SummaryBuilder:
         reserved_output_tokens: int = 256,
         per_chunk_target_tokens: int | None = None,
         max_rounds: int = 8,
-        temperature: float = 0.0,
+        temperature: float = 0.5,
+        verbose: bool = False,
+        stream_tps_every: float = 0.5,
     ):
-        self.llm = ChatOllama(model=model, temperature=temperature)
+        self.verbose = bool(verbose)
+        self._stream_cb = StreamToStdoutWithTPS(enabled=self.verbose, print_tps_every=stream_tps_every)
+
+        # Важно: streaming=True + callbacks
+        
+
         self.context_window_tokens = int(context_window_tokens)
         self.reserved_output_tokens = int(reserved_output_tokens)
         self.max_rounds = int(max_rounds)
 
+
+        self.llm = ChatOllama(
+            model=model,
+            temperature=temperature,
+            streaming=True,
+            callbacks=[self._stream_cb],
+
+            num_ctx=self.context_window_tokens,
+            num_predict=self.reserved_output_tokens,  # чтобы не “разгонялась” бесконечно
+            repeat_last_n=256,                        # смотреть дальше назад на повторы
+            repeat_penalty=1.25,                      # 1.15–1.35 обычно ок
+            top_p=0.9,
+        )
+        
         self._count_tokens = _default_token_counter(self.llm)
 
         self.effective_window_tokens = max(
@@ -121,15 +143,18 @@ class SummaryBuilder:
         )
         self.per_chunk_target_tokens = int(per_chunk_target_tokens or max(512, self.effective_window_tokens // 2))
 
-        self._theme_chain = self.build_theme_chain()
-        self._summarize_chain = self.build_summarize_chain()
-        self._reduce_chain = self.build_reduce_chain()
+        
+
+        self._theme_chain = build_theme_chain(self.llm)
+        self._summarize_chain = build_summarize_chain(self.llm)
+        self._reduce_chain = build_reduce_chain(self.llm)
         self._graph = self._build_graph()
+
 
     def __call__(self, grouped: dict[str, list[Message]]) -> dict[str, dict[str, str]]:
         out: dict[str, dict[str, str]] = {}
 
-        for theme_key, msgs in grouped.items():
+        for theme_key, msgs in tqdm(grouped.items()):
             text = _messages_to_text(msgs)
             if not text.strip():
                 out[theme_key] = {"theme": theme_key.strip(), "summary": ""}
@@ -159,6 +184,10 @@ class SummaryBuilder:
             text: str
             round: int
 
+        def _v(msg: str):
+            if self.verbose:
+                print(msg, flush=True)
+
         def chunk_and_summarize(state: State) -> State:
             chunks = _chunk_by_tokens(state["text"], self._count_tokens, self.per_chunk_target_tokens)
             if not chunks:
@@ -167,7 +196,8 @@ class SummaryBuilder:
                 return state
 
             summaries: list[str] = []
-            for ch in chunks:
+            for i, ch in enumerate(chunks, 1):
+                _v(f"\n=== summarize r={state['round']} chunk {i}/{len(chunks)} theme={state['theme']} ===\n")
                 s = self._summarize_chain.invoke({"theme": state["theme"], "chunk": ch}).strip()
                 summaries.append(s)
 
@@ -176,6 +206,7 @@ class SummaryBuilder:
             return state
 
         def reduce_once(state: State) -> State:
+            _v(f"\n=== reduce r={state['round']} theme={state['theme']} tokens={self._count_tokens(state['text'])} ===\n")
             reduced = self._reduce_chain.invoke({"theme": state["theme"], "summaries": state["text"]}).strip()
             state["text"] = reduced
             state["round"] += 1
