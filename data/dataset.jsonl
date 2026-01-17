@@ -1,0 +1,243 @@
+{"username":"elisey","msg_type":"text","text":"кто знает почему rpi не пингуется через ноут? вчера работало"}
+{"username":"andrey","msg_type":"text","text":"ты через usb-ethernet или прямой кабель? какой айпи был?"}
+{"username":"elisey","msg_type":"text","text":"прямой ethernet в ноут. раньше было 192.168.137.22"}
+{"username":"max","msg_type":"text","text":"если винда раздавала интернет, подсеть могла смениться после ребута"}
+{"username":"elisey","msg_type":"text","text":"да, и теперь по arp -a не вижу мак платы"}
+{"username":"sveta","msg_type":"text","text":"попробуй отключить/включить общий доступ и заново назначить статик на интерфейс"}
+{"username":"elisey","msg_type":"text","text":"как правильно зафиксировать айпишники, чтобы не прыгали?"}
+{"username":"andrey","msg_type":"text","text":"на винде: статический IPv4 на ethernet, на rpi: dhcpcd.conf или nmcli, но не смешивай"}
+{"username":"max","msg_type":"text","text":"и проверь что на rpi интерфейс поднят: ip a, ip r"}
+{"username":"elisey","msg_type":"text","text":"ок, но доступа нет, корпус закрыт, только usb и ethernet"}
+{"username":"sveta","msg_type":"text","text":"по usb терминал на rpi5 напрямую обычно не получится без гаджет-режима, лучше через сеть"}
+{"username":"elisey","msg_type":"text","text":"если у меня есть mac-адрес платы, могу ли я в любой сети найти её ip быстро?"}
+{"username":"andrey","msg_type":"text","text":"в пределах L2 да: arp/ndp/скан подсети + фильтр по MAC, но в другой VLAN не увидишь"}
+{"username":"max","msg_type":"text","text":"самое быстрое: посмотреть DHCP leases на роутере по MAC"}
+{"username":"elisey","msg_type":"text","text":"на маке ssh просит publickey, хотя я хочу пароль"}
+{"username":"sveta","msg_type":"text","text":"проверь в ssh_config: PreferredAuthentications, PubkeyAuthentication"}
+{"username":"andrey","msg_type":"text","text":"и на rpi в /etc/ssh/sshd_config: PasswordAuthentication yes"}
+{"username":"elisey","msg_type":"text","text":"sshd -T показывает authorizedkeysfile .ssh/authorized_keys"}
+{"username":"max","msg_type":"text","text":"это про ключи, но пароль отдельно. ещё проверь что user не заблокирован"}
+{"username":"elisey","msg_type":"text","text":"почему на маке пишет permission denied publickey сразу?"}
+{"username":"sveta","msg_type":"text","text":"возможно клиент даже не пробует пароль. добавь -o PreferredAuthentications=password"}
+{"username":"andrey","msg_type":"text","text":"или -o PubkeyAuthentication=no чтобы точно"}
+{"username":"elisey","msg_type":"text","text":"ok. ещё вопрос: как в cmd сделать ping-скан и вывести найденные адреса"}
+{"username":"max","msg_type":"text","text":"for /L %i in (1,1,254) do @ping ... && echo 10.0.111.%i"}
+{"username":"elisey","msg_type":"text","text":"попробую вечером"}
+{"username":"elisey","msg_type":"text","text":"тема камеры: mars5000s через icentral не коннектится, пишет openCamera fail"}
+{"username":"andrey","msg_type":"text","text":"она u3v или gige? сообщение про ethernet drivers смущает"}
+{"username":"elisey","msg_type":"text","text":"usb3 камера. в демо пишет /proc/modules u3v_drv not exist"}
+{"username":"max","msg_type":"text","text":"значит модуль драйвера не загрузился. dkms/headers совпадают с ядром?"}
+{"username":"sveta","msg_type":"text","text":"после обновления ядра модули часто ломаются, надо пересобрать"}
+{"username":"elisey","msg_type":"text","text":"ядро 6.12.47+rpt-rpi-2712, headers стоят"}
+{"username":"andrey","msg_type":"text","text":"lsmod | grep u3v, dmesg | tail, и права udev rules"}
+{"username":"elisey","msg_type":"text","text":"есть /etc/udev/rules.d/60-u3v-drv.rules, но всё равно fail"}
+{"username":"max","msg_type":"text","text":"а питание стабильное? usb3 камеры на пике могут просаживать"}
+{"username":"elisey","msg_type":"text","text":"питаю rpi от 5v5a, но через хаб ещё basler висит"}
+{"username":"sveta","msg_type":"text","text":"попробуй без хаба, напрямую, и посмотри lsusb меняется ли bus/device"}
+{"username":"elisey","msg_type":"text","text":"bus меняется после переподключения, это норм?"}
+{"username":"andrey","msg_type":"text","text":"да, это просто перечисление usb, важнее стабильность и то что устройство видно"}
+{"username":"elisey","msg_type":"text","text":"я написал fastapi сервер, хочу просто быстро и понятно, без сложностей"}
+{"username":"max","msg_type":"text","text":"главное не блокировать event loop, кадры в отдельном треде, отдача jpeg"}
+{"username":"sveta","msg_type":"text","text":"и сделай /health и /frame чтобы дебажить"}
+{"username":"elisey","msg_type":"text","text":"tmux через ssh -t не исполняет команды, просто открывает и всё"}
+{"username":"andrey","msg_type":"text","text":"потому что tmux new интерактивный, команда дальше не выполнится"}
+{"username":"max","msg_type":"text","text":"делай tmux new -d -s test 'bash start_server.sh' или tmux send-keys"}
+{"username":"elisey","msg_type":"text","text":"понял, спасибо"}
+{"username":"elisey","msg_type":"text","text":"как сохранить numpy image в png одной строкой?"}
+{"username":"sveta","msg_type":"text","text":"cv2.imwrite('img.png', img) или plt.imsave('img.png', img, cmap='gray')"}
+{"username":"elisey","msg_type":"text","text":"ок, буду через matplotlib чтобы без opencv зависимостей"}
+{"username":"andrey","msg_type":"text","text":"только если dtype не uint8, нормализуй"}
+{"username":"elisey","msg_type":"text","text":"да, я делаю normalize 0..255 и astype(uint8)"}
+{"username":"elisey","msg_type":"text","text":"по ml: для hyperspectral reconstruction хочу метрики psnr/sam/ergas"}
+{"username":"max","msg_type":"text","text":"sam важен, psnr может врать на спектре. ещё deltaE если в rgb проекция"}
+{"username":"sveta","msg_type":"text","text":"если есть wavelengths, делай аккуратный align по spectral shape"}
+{"username":"elisey","msg_type":"text","text":"у меня 61 канал 400-1000 нм, шаг примерно равномерный"}
+{"username":"andrey","msg_type":"text","text":"тогда spectralshape и интерполяция CMF/illuminant, потом XYZ->Lab->dE"}
+{"username":"elisey","msg_type":"text","text":"хочу ещё edge-weighted psnr, как идея: веса по градиенту"}
+{"username":"max","msg_type":"text","text":"делай веса = 1 + alpha*|∇|, и нормируй чтобы средний вес был 1"}
+{"username":"sveta","msg_type":"text","text":"только осторожно: весами можно надуть метрику, лучше показывать и обычную"}
+{"username":"elisey","msg_type":"text","text":"ок. ещё хочу разделить датасет train/val/test, чтобы без утечки сцен"}
+{"username":"andrey","msg_type":"text","text":"делай split по сценам/объектам, а не по патчам"}
+{"username":"max","msg_type":"text","text":"и seed фиксируй, сохраняй json со списками файлов"}
+{"username":"elisey","msg_type":"text","text":"модель: specat + msfn, думаю про ensemble"}
+{"username":"sveta","msg_type":"text","text":"ансамбль можно усреднять по спектру или по rgb-проекции, но лучше по loss"}
+{"username":"andrey","msg_type":"text","text":"если времени мало, начни с одного сильного бэйзлайна и чистого пайплайна"}
+{"username":"elisey","msg_type":"text","text":"да, сначала воспроизводимость: конфиги, логи, torchmetrics"}
+{"username":"max","msg_type":"text","text":"и проверь что eval на одинаковых кубах, без разных кропов"}
+{"username":"elisey","msg_type":"text","text":"самое больное: скорость. хочу легкий dataloader"}
+{"username":"sveta","msg_type":"text","text":"memory-mapped, prefetch, и минимум преобразований на лету"}
+{"username":"andrey","msg_type":"text","text":"и pin_memory + persistent_workers если на cuda"}
+{"username":"elisey","msg_type":"text","text":"железо: ищу тихий корпус/бп под 9950x + две 3090"}
+{"username":"max","msg_type":"text","text":"две 3090 = жара. нужен mesh фронт, хороший airflow, и бп 1200w+"}
+{"username":"sveta","msg_type":"text","text":"и кабели 3x8pin на каждую, без переходников"}
+{"username":"andrey","msg_type":"text","text":"по шуму: большие 140мм вентиляторы, низкие обороты, и водянка на cpu опционально"}
+{"username":"elisey","msg_type":"text","text":"хочу mesh+glass фронт, бюджет до 40к руб или больше"}
+{"username":"max","msg_type":"text","text":"смотри большие full-tower, чтобы карты не душили друг друга"}
+{"username":"sveta","msg_type":"text","text":"и проверь расстояние между слотами: нужна плата с x16/x16 или хотя бы x8/x8"}
+{"username":"elisey","msg_type":"text","text":"а thunderbolt 4 eGPU для 3090 имеет смысл?"}
+{"username":"andrey","msg_type":"text","text":"для обучения обычно не надо, пропускная узкая и драйверные нюансы"}
+{"username":"max","msg_type":"text","text":"лучше нормальный pci-e в системнике, tb4 для работы/демо"}
+{"username":"elisey","msg_type":"text","text":"по rpi: какой максимум напряжения на usb-c если лабораторник?"}
+{"username":"sveta","msg_type":"text","text":"без pd протокола rpi ждёт 5v, 9/12/15 только если источник предложит pd"}
+{"username":"andrey","msg_type":"text","text":"и кабель нужен e-marked для 5а режимов"}
+{"username":"elisey","msg_type":"text","text":"у меня fnirsi fnb58, он может быть pd source?"}
+{"username":"max","msg_type":"text","text":"он в основном триггер/тестер, не полноценный источник с контроллером"}
+{"username":"sveta","msg_type":"text","text":"тебе нужен pd source controller board, который сам говорит по cc линиям"}
+{"username":"elisey","msg_type":"text","text":"ок, а как измерить ток камеры по usb и при этом передавать данные?"}
+{"username":"andrey","msg_type":"text","text":"нужен usb power meter который поддерживает data pass-through и usb3, иначе скорость упадёт"}
+{"username":"max","msg_type":"text","text":"или shunt + usb3 breakout, но это уже колхоз"}
+{"username":"elisey","msg_type":"text","text":"понял"}
+{"username":"elisey","msg_type":"text","text":"возвращаясь к сети: rpi через другой роутер по ethernet видна, а через ноут нет"}
+{"username":"sveta","msg_type":"text","text":"значит проблема на стороне винды: общий доступ, firewall, или интерфейс не в той подсети"}
+{"username":"andrey","msg_type":"text","text":"проверь что ethernet на винде не в public profile, и что маршрут до 192.168.137.0/24 есть"}
+{"username":"max","msg_type":"text","text":"и что на rpi по тому интерфейсу реально 192.168.137.22, может теперь dhcp дал другое"}
+{"username":"elisey","msg_type":"text","text":"да, надо закрепить ip на rpi. сделаю статик"}
+{"username":"sveta","msg_type":"text","text":"и отключи wi-fi power save если он мешает, но у тебя wi-fi выключен"}
+{"username":"elisey","msg_type":"text","text":"спасибо, завтра проверю"}
+{"username":"elisey","msg_type":"text","text":"по камере: хочу /stream mjpeg и /snapshot png"}
+{"username":"max","msg_type":"text","text":"mjpeg: multipart/x-mixed-replace; boundary=frame"}
+{"username":"andrey","msg_type":"text","text":"а snapshot лучше отдавать jpeg тоже, png тяжелее, если не нужен lossless"}
+{"username":"sveta","msg_type":"text","text":"но для тестов png норм. главное не делать encode в main thread"}
+{"username":"elisey","msg_type":"text","text":"хочу минимум зависимостей: numpy + opencv только"}
+{"username":"max","msg_type":"text","text":"тогда cv2.imencode для jpeg, и отдаёшь bytes"}
+{"username":"elisey","msg_type":"text","text":"ок"}
+{"username":"elisey","msg_type":"text","text":"ml: как лучше логировать метрики по эпохам? tensorboard?"}
+{"username":"sveta","msg_type":"text","text":"tensorboard норм, ещё csv + json с конфигом"}
+{"username":"max","msg_type":"text","text":"и сохраняй best по val sam, не по psnr"}
+{"username":"andrey","msg_type":"text","text":"плюс фиксируй версию датасета и список файлов, иначе потом не повторишь"}
+{"username":"elisey","msg_type":"text","text":"да, делаю dataset_config.json"}
+{"username":"elisey","msg_type":"text","text":"железо: два 3090 рядом душат друг друга, что делать?"}
+{"username":"max","msg_type":"text","text":"либо вода на gpu, либо корпус и плата с расстоянием между слотами"}
+{"username":"sveta","msg_type":"text","text":"и можно поставить один gpu через riser вертикально, но airflow сложнее"}
+{"username":"andrey","msg_type":"text","text":"для тишины важнее большие вентиляторы и отсутствие турбулентности"}
+{"username":"elisey","msg_type":"text","text":"ладно, это отдельная тема"}
+{"username":"elisey","msg_type":"text","text":"сделал скан подсети, нашёл ip, но ssh всё равно publickey"}
+{"username":"sveta","msg_type":"text","text":"покажи команду ssh и verbose -vvv"}
+{"username":"andrey","msg_type":"text","text":"и проверь что user правильный, не root, и что PasswordAuthentication включён"}
+{"username":"max","msg_type":"text","text":"и на клиенте убери ключи: ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password"}
+{"username":"elisey","msg_type":"text","text":"ок"}
+{"username":"elisey","msg_type":"text","text":"камера: lsusb видит устройство, но sdk говорит camera connect fail"}
+{"username":"andrey","msg_type":"text","text":"может занято другим процессом или прав нет"}
+{"username":"sveta","msg_type":"text","text":"проверь dmesg на ошибки usb reset, и попробуй другой порт"}
+{"username":"max","msg_type":"text","text":"и кабель. usb3 кабели иногда адские"}
+{"username":"elisey","msg_type":"text","text":"ml: хочу сделать synthetic augmentation по спектру, как шум добавить?"}
+{"username":"andrey","msg_type":"text","text":"gaussian noise по каналам + небольшая spectral shift, но аккуратно"}
+{"username":"sveta","msg_type":"text","text":"и clamp в 0..1 или в исходный диапазон, иначе метрики поедут"}
+{"username":"max","msg_type":"text","text":"лучше сначала без аугментаций, потом добавляй по одной"}
+{"username":"elisey","msg_type":"text","text":"железо: БП 1200w хватит? две 3090 + 9950x"}
+{"username":"andrey","msg_type":"text","text":"впритык. зависит от лимитов, но лучше 1300-1500 для запаса и тишины"}
+{"username":"sveta","msg_type":"text","text":"и смотри по линии 12v, не только ватт"}
+{"username":"max","msg_type":"text","text":"плюс эффективность: на 50-60% нагрузки тише"}
+{"username":"elisey","msg_type":"text","text":"ок, я соберу список и вернусь"}
+{"username":"elisey","msg_type":"text","text":"апдейт по ssh: с -o PubkeyAuthentication=no заходит по паролю"}
+{"username":"andrey","msg_type":"text","text":"значит клиент раньше даже не пробовал пароль"}
+{"username":"sveta","msg_type":"text","text":"можно в ~/.ssh/config прописать хост и нужные опции"}
+{"username":"elisey","msg_type":"text","text":"да, так и сделаю, чтобы не писать каждый раз"}
+{"username":"max","msg_type":"text","text":"только не забудь потом вернуть ключи, пароль небезопасно"}
+{"username":"elisey","msg_type":"text","text":"ключи будут, просто сейчас надо было срочно зайти"}
+{"username":"elisey","msg_type":"text","text":"закрепил статический ip на rpi, теперь стабильно пингуется"}
+{"username":"andrey","msg_type":"text","text":"через dhcpcd или networkmanager?"}
+{"username":"elisey","msg_type":"text","text":"через dhcpcd.conf, без nm"}
+{"username":"sveta","msg_type":"text","text":"главное не включай оба одновременно"}
+{"username":"max","msg_type":"text","text":"и сделай backup конфига, rpi любит обновляться"}
+{"username":"elisey","msg_type":"text","text":"камера: без usb-хаба заработала"}
+{"username":"andrey","msg_type":"text","text":"значит хаб не тянул питание или криво работал"}
+{"username":"sveta","msg_type":"text","text":"usb3 хабы часто фейковые, особенно no-name"}
+{"username":"elisey","msg_type":"text","text":"буду брать активный с отдельным питанием"}
+{"username":"max","msg_type":"text","text":"и смотри чтобы реально был usb3, а не usb2 внутри"}
+{"username":"elisey","msg_type":"text","text":"fastapi сервер поднялся, mjpeg стрим идёт"}
+{"username":"andrey","msg_type":"text","text":"fps стабильный?"}
+{"username":"elisey","msg_type":"text","text":"около 18-20, камера даёт больше, но я ограничил"}
+{"username":"sveta","msg_type":"text","text":"норм, для диагностики хватает"}
+{"username":"max","msg_type":"text","text":"если надо больше, уйдёшь от mjpeg к raw/udp"}
+{"username":"elisey","msg_type":"text","text":"замерил температуру rpi под нагрузкой, 72 градуса"}
+{"username":"andrey","msg_type":"text","text":"нормально, троттлинг после ~80"}
+{"username":"sveta","msg_type":"text","text":"если корпус закрытый, добавь хоть маленький вентилятор"}
+{"username":"elisey","msg_type":"text","text":"да, поставлю 30мм на выдув"}
+{"username":"elisey","msg_type":"text","text":"ml: реализовал sam и psnr, значения странные"}
+{"username":"max","msg_type":"text","text":"sam в радианах или градусах?"}
+{"username":"elisey","msg_type":"text","text":"в радианах"}
+{"username":"sveta","msg_type":"text","text":"обычно репортят в градусах, умножь на 180/pi"}
+{"username":"elisey","msg_type":"text","text":"а, тогда всё сходится"}
+{"username":"andrey","msg_type":"text","text":"psnr по всему кубу или по каналам?"}
+{"username":"elisey","msg_type":"text","text":"по всему кубу"}
+{"username":"max","msg_type":"text","text":"ок, но иногда считают средний по каналам, просто будь консистентен"}
+{"username":"elisey","msg_type":"text","text":"edge-weighted psnr добавил как отдельную метрику"}
+{"username":"sveta","msg_type":"text","text":"пометь её как auxiliary, чтобы ревьюеры не придрались"}
+{"username":"andrey","msg_type":"text","text":"и обязательно формулу в тексте опиши"}
+{"username":"elisey","msg_type":"text","text":"да, напишу аккуратно"}
+{"username":"elisey","msg_type":"text","text":"разбил датасет по сценам, утечки нет"}
+{"username":"max","msg_type":"text","text":"сколько сцен всего?"}
+{"username":"elisey","msg_type":"text","text":"32, train 24, val 4, test 4"}
+{"username":"sveta","msg_type":"text","text":"норм, главное чтобы test не трогал до конца"}
+{"username":"andrey","msg_type":"text","text":"и seed сохрани в конфиге"}
+{"username":"elisey","msg_type":"text","text":"dataloader стал быстрее после memmap"}
+{"username":"max","msg_type":"text","text":"на сколько?"}
+{"username":"elisey","msg_type":"text","text":"примерно x1.7"}
+{"username":"sveta","msg_type":"text","text":"для hsi это хороший результат"}
+{"username":"andrey","msg_type":"text","text":"дальше упираешься в gpu"}
+{"username":"elisey","msg_type":"text","text":"железо: посмотрел платы, x16/x16 почти нет"}
+{"username":"max","msg_type":"text","text":"x8/x8 на gen4 почти не влияет на обучение"}
+{"username":"sveta","msg_type":"text","text":"для 3090 это ок, не bottleneck"}
+{"username":"elisey","msg_type":"text","text":"тогда проще с выбором"}
+{"username":"elisey","msg_type":"text","text":"нашёл корпус с mesh фронтом и 4x140мм"}
+{"username":"andrey","msg_type":"text","text":"главное расстояние между видеокартами"}
+{"username":"sveta","msg_type":"text","text":"и чтобы стекло не перекрывало фронт полностью"}
+{"username":"max","msg_type":"text","text":"проверь отзывы на шум"}
+{"username":"elisey","msg_type":"text","text":"по питанию: взял активный usb3 хаб с бп"}
+{"username":"andrey","msg_type":"text","text":"отдельный бп сильно повышает стабильность"}
+{"username":"sveta","msg_type":"text","text":"особенно с камерами"}
+{"username":"elisey","msg_type":"text","text":"да, больше нет random disconnect"}
+{"username":"elisey","msg_type":"text","text":"ssh автоскрипт с tmux теперь работает"}
+{"username":"max","msg_type":"text","text":"через tmux new -d?"}
+{"username":"elisey","msg_type":"text","text":"да, и send-keys для рестарта"}
+{"username":"sveta","msg_type":"text","text":"классический сетап для стенда"}
+{"username":"elisey","msg_type":"text","text":"ml: хочу добавить spectral shift augmentation"}
+{"username":"andrey","msg_type":"text","text":"делай маленький shift, 1-2 нм эквивалент"}
+{"username":"sveta","msg_type":"text","text":"и не на всех сэмплах, 20-30%"}
+{"username":"max","msg_type":"text","text":"иначе модель начнёт учить артефакты"}
+{"username":"elisey","msg_type":"text","text":"ок, добавлю флагом в конфиг"}
+{"username":"elisey","msg_type":"text","text":"логирование: tensorboard + csv"}
+{"username":"andrey","msg_type":"text","text":"и сохрани git commit hash"}
+{"username":"sveta","msg_type":"text","text":"да, это сильно помогает потом"}
+{"username":"elisey","msg_type":"text","text":"я пишу его в run_info.json"}
+{"username":"elisey","msg_type":"text","text":"железо: думаю про водянку на cpu"}
+{"username":"max","msg_type":"text","text":"для тишины да, особенно под длительной нагрузкой"}
+{"username":"sveta","msg_type":"text","text":"но следи за надёжностью, помпа 24/7"}
+{"username":"andrey","msg_type":"text","text":"воздушный топ тоже вариант, если airflow хороший"}
+{"username":"elisey","msg_type":"text","text":"rpi стенд теперь стабилен сутки"}
+{"username":"sveta","msg_type":"text","text":"значит можно считать продакшн-готовым"}
+{"username":"max","msg_type":"text","text":"только watchdog настрой"}
+{"username":"elisey","msg_type":"text","text":"да, systemd watchdog + restart on failure"}
+{"username":"elisey","msg_type":"text","text":"камера пишет серии кадров без дропов"}
+{"username":"andrey","msg_type":"text","text":"fps совпадает с заявленным?"}
+{"username":"elisey","msg_type":"text","text":"да, если напрямую, через хаб было хуже"}
+{"username":"sveta","msg_type":"text","text":"ещё одно подтверждение что хаб был проблемой"}
+{"username":"elisey","msg_type":"text","text":"ml: baseline обучился, psnr вырос на 2дб"}
+{"username":"max","msg_type":"text","text":"хорошо"}
+{"username":"sveta","msg_type":"text","text":"sam упал?"}
+{"username":"elisey","msg_type":"text","text":"да, примерно на 15%"}
+{"username":"andrey","msg_type":"text","text":"значит всё идёт в правильную сторону"}
+{"username":"elisey","msg_type":"text","text":"ансамбль пока отложу"}
+{"username":"max","msg_type":"text","text":"разумно, сначала доведи один"}
+{"username":"sveta","msg_type":"text","text":"ансамбль — это уже polishing"}
+{"username":"elisey","msg_type":"text","text":"железо закажу на следующей неделе"}
+{"username":"andrey","msg_type":"text","text":"не забудь проверить габариты видеокарт"}
+{"username":"sveta","msg_type":"text","text":"и длину бп"}
+{"username":"elisey","msg_type":"text","text":"всё замерил, влезает"}
+{"username":"elisey","msg_type":"text","text":"rpi: отключил всё лишнее, загрузка минимальная"}
+{"username":"max","msg_type":"text","text":"bt, wifi, hdmi?"}
+{"username":"elisey","msg_type":"text","text":"да, всё off"}
+{"username":"sveta","msg_type":"text","text":"отлично для headless"}
+{"username":"elisey","msg_type":"text","text":"думаю добавить heartbeat в сервис"}
+{"username":"andrey","msg_type":"text","text":"обязательно, для мониторинга"}
+{"username":"sveta","msg_type":"text","text":"простой /health с uptime и статусом камеры"}
+{"username":"elisey","msg_type":"text","text":"так и сделаю"}
+{"username":"elisey","msg_type":"text","text":"ml: хочу сохранить predictions для test"}
+{"username":"max","msg_type":"text","text":"сохраняй кубы + метрики в json"}
+{"username":"sveta","msg_type":"text","text":"и несколько визуализаций для sanity check"}
+{"username":"elisey","msg_type":"text","text":"ок"}
+{"username":"elisey","msg_type":"text","text":"спасибо всем, кажется стек стабилизировался"}
+{"username":"andrey","msg_type":"text","text":"класс"}
+{"username":"sveta","msg_type":"text","text":"да, хороший прогресс"}
+{"username":"max","msg_type":"text","text":"жди новых багов, но теперь ты готов"}
