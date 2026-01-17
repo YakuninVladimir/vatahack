@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bot
+  labels:
+    app: bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bot
+  template:
+    metadata:
+      labels:
+        app: bot
+    spec:
+      containers:
+        - name: bot
+          image: vatahack/client:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TG_BOT_TOKEN
+              value: "8553884677:AAGuU98yLO2kDGj3mMLz0fKJm_AhSfkyhBQ"
+            - name: DB_DSN
+              value: "postgresql://vatahack:vatahack@postgres:5432/vatahack"
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+            - name: AGENT_URL
+              value: "http://stub-service:8001"
+            - name: SUMMARY_MAX_MESSAGES
+              value: "1000"
+            - name: SUMMARY_MIN_TOPIC_SIZE
+              value: "10"
+            - name: SUMMARY_INCLUDE_NOISE
+              value: "true"
+            - name: SUMMARY_CONTEXT_WINDOW_TOKENS
+              value: "4096"
+            - name: SUMMARY_OLLAMA_MODEL
+              value: "qwen2.5:1.5b-instruct"
+            - name: LOG_LEVEL
+              value: "INFO"

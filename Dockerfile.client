@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements-client.txt /app/requirements-client.txt
+RUN pip install --no-cache-dir -r /app/requirements-client.txt
+
+COPY bot_main.py /app/bot_main.py
+COPY config.py /app/config.py
+COPY handlers /app/handlers
+COPY db_functions /app/db_functions
+COPY cleaners /app/cleaners
+COPY utils /app/utils
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "bot_main.py"]
