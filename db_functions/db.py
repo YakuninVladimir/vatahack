@@ -1,5 +1,6 @@
 import asyncpg
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
 from config import DB_DSN
@@ -74,6 +75,16 @@ async def db_init(dsn: str = DB_DSN):
             chat_id BIGINT NOT NULL,
             thread_id BIGINT NOT NULL,
             last_message_id BIGINT NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            PRIMARY KEY (chat_id, thread_id)
+        );
+        """)
+
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS summary_results (
+            chat_id BIGINT NOT NULL,
+            thread_id BIGINT NOT NULL,
+            summary_json TEXT NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (chat_id, thread_id)
         );
@@ -242,6 +253,64 @@ async def set_summary_checkpoint_db(chat_id: int, thread_id: int | None, message
             chat_id,
             tid,
             message_id,
+        )
+
+
+async def get_summary_state_db(chat_id: int, thread_id: int | None) -> dict[str, str] | None:
+    """
+    Возвращает сохраненное саммари в виде словаря {theme: summary}.
+    """
+    pool = _require_pool()
+    tid = _checkpoint_thread_id(thread_id)
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT summary_json
+            FROM summary_results
+            WHERE chat_id=$1 AND thread_id=$2
+            """,
+            chat_id,
+            tid,
+        )
+        if not row:
+            return None
+        raw = row["summary_json"]
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("Invalid summary JSON chat_id=%s thread_id=%s", chat_id, tid)
+        return None
+
+    if not isinstance(data, dict):
+        return None
+
+    cleaned: dict[str, str] = {}
+    for key, value in data.items():
+        if value is None:
+            continue
+        cleaned[str(key)] = str(value)
+    return cleaned
+
+
+async def set_summary_state_db(chat_id: int, thread_id: int | None, summary: dict[str, str]):
+    """
+    Сохраняет саммари в виде словаря {theme: summary}.
+    """
+    pool = _require_pool()
+    tid = _checkpoint_thread_id(thread_id)
+    payload = json.dumps(summary or {})
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO summary_results (chat_id, thread_id, summary_json, updated_at)
+            VALUES ($1, $2, $3, now())
+            ON CONFLICT (chat_id, thread_id)
+            DO UPDATE SET summary_json=EXCLUDED.summary_json, updated_at=now()
+            """,
+            chat_id,
+            tid,
+            payload,
         )
 
 

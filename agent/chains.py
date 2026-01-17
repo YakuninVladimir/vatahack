@@ -46,3 +46,20 @@ def build_reduce_chain(llm):
         ]
     )
     return prompt | llm | StrOutputParser()
+
+def build_update_chain(llm):
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "Обнови саммари темы на русском, используя предыдущее саммари и новое саммари. "
+                "Убирай повторы, сохраняй ключевые факты. Формат: 6–12 буллетов.",
+            ),
+            (
+                "human",
+                "Тема: {theme}\n\nПредыдущее саммари:\n<<<\n{previous_summary}\n>>>\n\n"
+                "Новое саммари:\n<<<\n{summary}\n>>>\n\nОбновленное саммари буллетами:",
+            ),
+        ]
+    )
+    return prompt | llm | StrOutputParser()

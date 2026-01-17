@@ -6,7 +6,7 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import END, StateGraph
 
 from agent import Message
-from agent.chains import build_reduce_chain, build_summarize_chain, build_theme_chain
+from agent.chains import build_reduce_chain, build_summarize_chain, build_theme_chain, build_update_chain
 
 def _default_token_counter(llm: ChatOllama) -> Callable[[str], int]:
     """
@@ -128,19 +128,29 @@ class SummaryBuilder:
         self._theme_chain = build_theme_chain(self.llm)
         self._summarize_chain = build_summarize_chain(self.llm)
         self._reduce_chain = build_reduce_chain(self.llm)
+        self._update_chain = build_update_chain(self.llm)
         self._graph = self._build_graph()
 
-    def __call__(self, grouped: dict[str, list[Message]]) -> dict[str, dict[str, str]]:
+    def __call__(
+        self,
+        grouped: dict[str, list[Message]],
+        previous_summary: dict[str, str] | None = None,
+    ) -> dict[str, dict[str, str]]:
         out: dict[str, dict[str, str]] = {}
+        prev = previous_summary or {}
+        used_themes: set[str] = set()
 
         for theme_key, msgs in grouped.items():
             text = _messages_to_text(msgs)
             if not text.strip():
-                out[theme_key] = {"theme": theme_key.strip(), "summary": ""}
+                theme_name = theme_key.strip()
+                summary_text = prev.get(theme_name, "")
+                out[theme_name] = {"theme": theme_name, "summary": summary_text}
+                used_themes.add(theme_name)
                 continue
 
             keywords = _parse_keywords(theme_key)
-            theme_name = self._theme_chain.invoke({"keywords": ", ".join(keywords)}).strip()
+            theme_name = self._theme_chain.invoke({"keywords": ", ".join(keywords)}).strip() or theme_key.strip()
 
             summary = self._graph.invoke(
                 {
@@ -151,7 +161,27 @@ class SummaryBuilder:
                 }
             )["text"]
 
-            out[theme_key] = {"theme": theme_name, "summary": str(summary).strip()}
+            summary_text = str(summary).strip()
+            prev_text = prev.get(theme_name)
+            if prev_text:
+                if summary_text:
+                    summary_text = self._update_chain.invoke(
+                        {
+                            "theme": theme_name,
+                            "previous_summary": prev_text,
+                            "summary": summary_text,
+                        }
+                    ).strip()
+                else:
+                    summary_text = prev_text
+
+            out[theme_name] = {"theme": theme_name, "summary": summary_text}
+            used_themes.add(theme_name)
+
+        for theme_name, summary_text in prev.items():
+            if theme_name in used_themes:
+                continue
+            out[theme_name] = {"theme": theme_name, "summary": str(summary_text).strip()}
 
         return out
 

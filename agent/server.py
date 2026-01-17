@@ -22,6 +22,7 @@ class AnalyzeRequest(BaseModel):
 
     ollama_model: str = "qwen2.5:1.5b-instruct"
     context_window_tokens: int = 4096
+    previous_summary: dict[str, str] | None = None
 
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
@@ -54,7 +55,7 @@ def analyze(req: AnalyzeRequest) -> dict[str, dict[str, str]]:
             context_window_tokens=req.context_window_tokens,
             base_url=OLLAMA_BASE_URL,
         )
-        result = builder(grouped)  # dict[str, {"theme": str, "summary": str}]
+        result = builder(grouped, previous_summary=req.previous_summary)  # dict[str, {"theme": str, "summary": str}]
         logger.info("Analyze completed: themes=%s", len(result))
         return result
     except Exception as e:

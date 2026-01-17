@@ -15,7 +15,7 @@ from config import (
     SUMMARY_OLLAMA_MODEL,
 )
 from db_functions.checkpoints import get_last_checkpoint, set_last_checkpoint
-from db_functions.db import get_messages_after_id
+from db_functions.db import get_messages_after_id, get_summary_state_db, set_summary_state_db
 
 
 router = Router()
@@ -28,7 +28,7 @@ def _messages_for_agent(messages: list[dict]) -> list[dict]:
         msg_type = msg.get("type") or "text"
         text = (msg.get("text") or "").strip()
         if not text:
-            text = f"[{msg_type}]"
+            continue
         user = msg.get("username") or str(msg.get("user_id") or "user")
         out.append({"user": user, "type": msg_type, "text": text})
     return out
@@ -48,6 +48,18 @@ def _format_summary(result: dict) -> str:
             summary = "(нет данных)"
         blocks.append(f"Тема: {theme}\n{summary}")
     return "\n\n".join(blocks)
+
+def _summary_state_from_result(result: dict) -> dict[str, str]:
+    state: dict[str, str] = {}
+    for theme_key, item in result.items():
+        if not isinstance(item, dict):
+            continue
+        theme = (item.get("theme") or theme_key or "").strip()
+        summary = (item.get("summary") or "").strip()
+        if not theme or not summary:
+            continue
+        state[theme] = summary
+    return state
 
 
 
@@ -76,20 +88,30 @@ async def summarize(message: Message):
     )
 
     if not messages:
-        await set_last_checkpoint(chat_id=chat_id, thread_id=thread_id, message_id=current_message_id)
-        logger.info("Checkpoint updated chat_id=%s thread_id=%s message_id=%s", chat_id, thread_id, current_message_id)
         await message.answer("Новых сообщений для суммаризации не найдено.")
         return
 
     logger.info("Messages collected for summary: %s", len(messages))
+    last_message_id = messages[-1]["message_id"]
+
+    agent_messages = _messages_for_agent(messages)
+    if not agent_messages:
+        await set_last_checkpoint(chat_id=chat_id, thread_id=thread_id, message_id=last_message_id)
+        logger.info("Checkpoint updated chat_id=%s thread_id=%s message_id=%s", chat_id, thread_id, last_message_id)
+        await message.answer("Новых текстовых сообщений для суммаризации не найдено.")
+        return
+
+    previous_summary = await get_summary_state_db(chat_id=chat_id, thread_id=thread_id)
 
     payload = {
-        "messages": _messages_for_agent(messages),
+        "messages": agent_messages,
         "min_topic_size": SUMMARY_MIN_TOPIC_SIZE,
         "include_noise": SUMMARY_INCLUDE_NOISE,
         "ollama_model": SUMMARY_OLLAMA_MODEL,
         "context_window_tokens": SUMMARY_CONTEXT_WINDOW_TOKENS,
     }
+    if previous_summary:
+        payload["previous_summary"] = previous_summary
 
     base_url = AGENT_URL.rstrip("/")
     url = base_url if base_url.endswith("/analyze") else f"{base_url}/analyze"
@@ -108,9 +130,13 @@ async def summarize(message: Message):
         return
 
     summary_text = _format_summary(result)
+    summary_state = _summary_state_from_result(result)
+    if not summary_state and previous_summary:
+        summary_state = previous_summary
+    await set_summary_state_db(chat_id=chat_id, thread_id=thread_id, summary=summary_state)
 
-    await set_last_checkpoint(chat_id=chat_id, thread_id=thread_id, message_id=current_message_id)
+    await set_last_checkpoint(chat_id=chat_id, thread_id=thread_id, message_id=last_message_id)
 
-    logger.info("Checkpoint updated chat_id=%s thread_id=%s message_id=%s", chat_id, thread_id, current_message_id)
+    logger.info("Checkpoint updated chat_id=%s thread_id=%s message_id=%s", chat_id, thread_id, last_message_id)
 
     await message.answer(f"📄 Суммаризация:\n\n{summary_text}")
