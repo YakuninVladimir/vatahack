@@ -1,25 +1,22 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Any, Callable
+from typing import  Callable
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, StateGraph
 
-
-@dataclass
-class Message:
-    user: str
-    type: str
-    text: str
-
-    def __len__(self) -> int:
-        return len(self.text) + len(self.type) + len(self.user)
-
+from agent import Message
+from agent.chains import build_reduce_chain, build_summarize_chain, build_theme_chain
 
 def _default_token_counter(llm: ChatOllama) -> Callable[[str], int]:
+    """
+    Build a token counting function for a given Ollama chat model.
+
+    Tries to use `llm.get_num_tokens(text)` if available (some LangChain LLMs expose it),
+    otherwise falls back to a cheap heuristic: ~1 token per 4 characters.
+
+    The returned callable always returns at least 1.
+    """
     def count(text: str) -> int:
         fn = getattr(llm, "get_num_tokens", None)
         if callable(fn):
@@ -33,11 +30,26 @@ def _default_token_counter(llm: ChatOllama) -> Callable[[str], int]:
 
 
 def _parse_keywords(theme_key: str) -> list[str]:
+    """
+    Parse keywords from a theme key produced by ThemesExtractor.
+
+    Expected format: "kw1 / kw2 / kw3" (slashes as separators).
+    Returns up to 12 cleaned keywords. If parsing yields nothing, returns the stripped
+    original key as a single-element list.
+    """
     parts = [p.strip() for p in theme_key.split("/") if p.strip()]
     return parts[:12] if parts else [theme_key.strip()]
 
 
 def _messages_to_text(messages: list[Message]) -> str:
+    """
+    Convert a list of Message objects into a single multiline string.
+
+    Each message becomes one line:
+        "<user> [<type>]: <text>"
+
+    Empty/whitespace-only texts are skipped.
+    """
     lines: list[str] = []
     for m in messages:
         t = m.text.strip()
@@ -47,6 +59,16 @@ def _messages_to_text(messages: list[Message]) -> str:
 
 
 def _chunk_by_tokens(text: str, token_count: Callable[[str], int], max_tokens: int) -> list[str]:
+    """
+    Split `text` into chunks that fit into `max_tokens` according to `token_count`.
+
+    Strategy:
+    - Split by lines (keeps chat structure stable).
+    - Greedily pack consecutive non-empty lines into a buffer until adding the next line
+      would exceed `max_tokens`, then flush the buffer as a chunk.
+
+    Returns a list of chunk strings. Returns [] if `text` has no non-empty lines.
+    """
     lines = [ln for ln in text.splitlines() if ln.strip()]
     if not lines:
         return []
@@ -99,9 +121,9 @@ class SummaryBuilder:
         )
         self.per_chunk_target_tokens = int(per_chunk_target_tokens or max(512, self.effective_window_tokens // 2))
 
-        self._theme_chain = self._build_theme_chain()
-        self._summarize_chain = self._build_summarize_chain()
-        self._reduce_chain = self._build_reduce_chain()
+        self._theme_chain = self.build_theme_chain()
+        self._summarize_chain = self.build_summarize_chain()
+        self._reduce_chain = self.build_reduce_chain()
         self._graph = self._build_graph()
 
     def __call__(self, grouped: dict[str, list[Message]]) -> dict[str, dict[str, str]]:
@@ -129,51 +151,6 @@ class SummaryBuilder:
 
         return out
 
-    def _build_theme_chain(self):
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "Сгенерируй короткое название темы на русском по ключевым словам. "
-                    "Только название: 2–6 слов, без кавычек, без точки.",
-                ),
-                ("human", "Ключевые слова: {keywords}\nНазвание темы:"),
-            ]
-        )
-        return prompt | self.llm | StrOutputParser()
-
-    def _build_summarize_chain(self):
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "Суммаризируй фрагмент диалога на русском. "
-                    "По делу, без воды. Формат: 5–12 буллетов. "
-                    "Сохраняй технические детали (команды, протоколы, ошибки), если они есть.",
-                ),
-                (
-                    "human",
-                    "Тема: {theme}\n\nФрагмент сообщений:\n<<<\n{chunk}\n>>>\n\nСаммари буллетами:",
-                ),
-            ]
-        )
-        return prompt | self.llm | StrOutputParser()
-
-    def _build_reduce_chain(self):
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "Сожми набор саммари в более короткое итоговое саммари на русском. "
-                    "Убирай повторы, сохраняй ключевые факты/выводы. Формат: 6–12 буллетов.",
-                ),
-                (
-                    "human",
-                    "Тема: {theme}\n\nСаммари фрагментов:\n<<<\n{summaries}\n>>>\n\nИтоговое саммари буллетами:",
-                ),
-            ]
-        )
-        return prompt | self.llm | StrOutputParser()
 
     def _build_graph(self):
         class State(dict):  # type: ignore
