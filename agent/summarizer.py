@@ -125,9 +125,9 @@ class SummaryBuilder:
         )
         self.per_chunk_target_tokens = int(per_chunk_target_tokens or max(512, self.effective_window_tokens // 2))
 
-        self._theme_chain = self.build_theme_chain()
-        self._summarize_chain = self.build_summarize_chain()
-        self._reduce_chain = self.build_reduce_chain()
+        self._theme_chain = build_theme_chain(self.llm)
+        self._summarize_chain = build_summarize_chain(self.llm)
+        self._reduce_chain = build_reduce_chain(self.llm)
         self._graph = self._build_graph()
 
     def __call__(self, grouped: dict[str, list[Message]]) -> dict[str, dict[str, str]]:

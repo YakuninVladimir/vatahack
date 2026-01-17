@@ -23,6 +23,7 @@
 - SUMMARY_INCLUDE_NOISE (по умолчанию true)
 - SUMMARY_OLLAMA_MODEL (по умолчанию qwen2.5:1.5b-instruct)
 - SUMMARY_CONTEXT_WINDOW_TOKENS (по умолчанию 4096)
+- SUMMARY_AGENT_TIMEOUT_SECONDS (по умолчанию 0; 0 = без таймаута)
 - LOG_LEVEL (по умолчанию INFO)
 
 Агент:
@@ -44,6 +45,8 @@ kubectl apply -f k8s/redis.yaml
 kubectl apply -f k8s/ollama.yaml
 kubectl apply -f k8s/stub-service.yaml
 kubectl apply -f k8s/client-job.yaml
+kubectl exec deployment/ollama -- ollama list
+
 ```
 
 3) Укажите TG_BOT_TOKEN в `k8s/client-job.yaml` (или задайте через `kubectl set env`).

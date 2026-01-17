@@ -28,6 +28,17 @@ class ThemesExtractor:
             self.last_result = {"themes": [], "msg_topics": [], "topic_info": []}
             return {}
 
+        if len(docs) < max(2, self.min_topic_size):
+            grouped = {}
+            if self.include_noise:
+                grouped = {"misc": [messages[i] for i in idx_map]}
+            self.last_result = {
+                "themes": self._themes_from_mapping(grouped),
+                "msg_topics": [-1] * len(docs),
+                "topic_info": [],
+            }
+            return grouped
+
         topic_model = BERTopic(
             embedding_model=self._embedder,
             language="multilingual",
@@ -37,7 +48,18 @@ class ThemesExtractor:
             verbose=False,
         )
 
-        msg_topics, _ = topic_model.fit_transform(docs)
+        try:
+            msg_topics, _ = topic_model.fit_transform(docs)
+        except Exception:
+            grouped = {}
+            if self.include_noise:
+                grouped = {"misc": [messages[i] for i in idx_map]}
+            self.last_result = {
+                "themes": self._themes_from_mapping(grouped),
+                "msg_topics": [-1] * len(docs),
+                "topic_info": [],
+            }
+            return grouped
 
         topic_id_to_name = self._topic_id_to_name(topic_model)
         grouped: dict[str, list[Message]] = {}

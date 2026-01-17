@@ -7,6 +7,7 @@ from aiogram.types import Message
 
 from config import (
     AGENT_URL,
+    SUMMARY_AGENT_TIMEOUT_SECONDS,
     SUMMARY_CONTEXT_WINDOW_TOKENS,
     SUMMARY_INCLUDE_NOISE,
     SUMMARY_MAX_MESSAGES,
@@ -94,7 +95,10 @@ async def summarize(message: Message):
     url = base_url if base_url.endswith("/analyze") else f"{base_url}/analyze"
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        timeout = None
+        if SUMMARY_AGENT_TIMEOUT_SECONDS > 0:
+            timeout = httpx.Timeout(SUMMARY_AGENT_TIMEOUT_SECONDS)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             result = resp.json()
