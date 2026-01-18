@@ -79,3 +79,12 @@ kubectl delete pvc postgres-data
 - Ollama + модели для суммаризации/тематизации
 - BERTopic, Sentence Transformers, LangChain, LangGraph
 - Docker, Kubernetes (манифесты в k8s/)
+
+## Стек разработки
+
+- Python 3.x
+- Aiogram (Telegram bot), FastAPI (stub-service)
+- PostgreSQL (asyncpg), Redis
+- Ollama + модели для суммаризации/тематизации
+- BERTopic, Sentence Transformers, LangChain, LangGraph
+- Docker, Kubernetes (манифесты в `k8s/`)
