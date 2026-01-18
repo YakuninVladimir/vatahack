@@ -6,7 +6,7 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import END, StateGraph
 
 from agent import Message
-from agent.chains import build_reduce_chain, build_summarize_chain, build_theme_chain, build_update_chain
+from agent.chains import build_reduce_chain, build_summarize_chain, build_theme_chain, build_update_chain, build_refine_theme_chain
 
 
 def _default_token_counter(llm: ChatOllama) -> Callable[[str], int]:
@@ -95,17 +95,6 @@ def _chunk_by_tokens(text: str, token_count: Callable[[str], int], max_tokens: i
     return chunks
 
 
-def build_refine_theme_chain(llm: ChatOllama):
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "Ты формулируешь краткое и точное название темы обсуждения."),
-        ("human",
-         "Ключевые слова: {keywords}\n\n"
-         "Сводка обсуждения:\n{summary}\n\n"
-         "Сформулируй краткое название темы (2–6 слов).")
-    ])
-    return prompt | llm | StrOutputParser()
-
-
 class SummaryBuilder:
     """
     Input:  dict[theme_key -> list[Message]]  (theme_key ~= "k1 / k2 / k3")
@@ -114,15 +103,21 @@ class SummaryBuilder:
 
     def __init__(
             self,
-            model: str = "qwen2.5:1.5b-instruct",
+            model: str = "qwen2.5:3b-instruct",
             base_url: str | None = None,
             context_window_tokens: int = 4096,
             reserved_output_tokens: int = 256,
             per_chunk_target_tokens: int | None = None,
             max_rounds: int = 8,
-            temperature: float = 0.0,
+            temperature: float = 0.5,
     ):
-        llm_kwargs = {"model": model, "temperature": temperature}
+        llm_kwargs = {
+            "model": model,
+            "temperature": temperature,
+            "repeat_last_n": 256,                        
+            "repeat_penalty": 1.25,   
+            "reasoning": True,                       
+        }
         if base_url:
             llm_kwargs["base_url"] = base_url
         self.llm = ChatOllama(**llm_kwargs)
