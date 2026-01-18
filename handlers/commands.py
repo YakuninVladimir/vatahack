@@ -1,6 +1,7 @@
 import logging
 
 import httpx
+import asyncio
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -196,5 +197,4 @@ async def summarize(message: Message):
         try:
             await message.answer(chunk)
         except TelegramBadRequest:
-            # fallback на всякий случай
             await message.answer(chunk[:TG_MESSAGE_LIMIT])

@@ -1,4 +1,4 @@
-from typing import  Callable
+from typing import Callable
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,6 +7,7 @@ from langgraph.graph import END, StateGraph
 
 from agent import Message
 from agent.chains import build_reduce_chain, build_summarize_chain, build_theme_chain, build_update_chain
+
 
 def _default_token_counter(llm: ChatOllama) -> Callable[[str], int]:
     """
@@ -17,6 +18,7 @@ def _default_token_counter(llm: ChatOllama) -> Callable[[str], int]:
 
     The returned callable always returns at least 1.
     """
+
     def count(text: str) -> int:
         fn = getattr(llm, "get_num_tokens", None)
         if callable(fn):
@@ -93,6 +95,17 @@ def _chunk_by_tokens(text: str, token_count: Callable[[str], int], max_tokens: i
     return chunks
 
 
+def build_refine_theme_chain(llm: ChatOllama):
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "Ты формулируешь краткое и точное название темы обсуждения."),
+        ("human",
+         "Ключевые слова: {keywords}\n\n"
+         "Сводка обсуждения:\n{summary}\n\n"
+         "Сформулируй краткое название темы (2–6 слов).")
+    ])
+    return prompt | llm | StrOutputParser()
+
+
 class SummaryBuilder:
     """
     Input:  dict[theme_key -> list[Message]]  (theme_key ~= "k1 / k2 / k3")
@@ -100,14 +113,14 @@ class SummaryBuilder:
     """
 
     def __init__(
-        self,
-        model: str = "qwen2.5:1.5b-instruct",
-        base_url: str | None = None,
-        context_window_tokens: int = 4096,
-        reserved_output_tokens: int = 256,
-        per_chunk_target_tokens: int | None = None,
-        max_rounds: int = 8,
-        temperature: float = 0.0,
+            self,
+            model: str = "qwen2.5:1.5b-instruct",
+            base_url: str | None = None,
+            context_window_tokens: int = 4096,
+            reserved_output_tokens: int = 256,
+            per_chunk_target_tokens: int | None = None,
+            max_rounds: int = 8,
+            temperature: float = 0.0,
     ):
         llm_kwargs = {"model": model, "temperature": temperature}
         if base_url:
@@ -126,22 +139,26 @@ class SummaryBuilder:
         self.per_chunk_target_tokens = int(per_chunk_target_tokens or max(512, self.effective_window_tokens // 2))
 
         self._theme_chain = build_theme_chain(self.llm)
+        self._refine_theme_chain = build_refine_theme_chain(self.llm)
         self._summarize_chain = build_summarize_chain(self.llm)
         self._reduce_chain = build_reduce_chain(self.llm)
         self._update_chain = build_update_chain(self.llm)
         self._graph = self._build_graph()
 
     def __call__(
-        self,
-        grouped: dict[str, list[Message]],
-        previous_summary: dict[str, str] | None = None,
+            self,
+            grouped: dict[str, list[Message]],
+            previous_summary: dict[str, str] | None = None,
     ) -> dict[str, dict[str, str]]:
+
         out: dict[str, dict[str, str]] = {}
         prev = previous_summary or {}
         used_themes: set[str] = set()
 
         for theme_key, msgs in grouped.items():
             text = _messages_to_text(msgs)
+            keywords = _parse_keywords(theme_key)
+
             if not text.strip():
                 theme_name = theme_key.strip()
                 summary_text = prev.get(theme_name, "")
@@ -149,12 +166,18 @@ class SummaryBuilder:
                 used_themes.add(theme_name)
                 continue
 
-            keywords = _parse_keywords(theme_key)
-            theme_name = self._theme_chain.invoke({"keywords": ", ".join(keywords)}).strip() or theme_key.strip()
+            # 1️⃣ Черновая тема по keywords
+            draft_theme = (
+                    self._theme_chain.invoke(
+                        {"keywords": ", ".join(keywords)}
+                    ).strip()
+                    or theme_key.strip()
+            )
 
+            # 2️⃣ Summary через граф
             summary = self._graph.invoke(
                 {
-                    "theme": theme_name,
+                    "theme": draft_theme,
                     "keywords": keywords,
                     "text": text,
                     "round": 0,
@@ -162,12 +185,14 @@ class SummaryBuilder:
             )["text"]
 
             summary_text = str(summary).strip()
-            prev_text = prev.get(theme_name)
+
+            # 3️⃣ Update с предыдущей сводкой
+            prev_text = prev.get(draft_theme)
             if prev_text:
                 if summary_text:
                     summary_text = self._update_chain.invoke(
                         {
-                            "theme": theme_name,
+                            "theme": draft_theme,
                             "previous_summary": prev_text,
                             "summary": summary_text,
                         }
@@ -175,16 +200,31 @@ class SummaryBuilder:
                 else:
                     summary_text = prev_text
 
-            out[theme_name] = {"theme": theme_name, "summary": summary_text}
-            used_themes.add(theme_name)
+            final_theme = (
+                    self._refine_theme_chain.invoke(
+                        {
+                            "keywords": ", ".join(keywords),
+                            "summary": summary_text,
+                        }
+                    ).strip()
+                    or draft_theme
+            )
+
+            out[final_theme] = {
+                "theme": final_theme,
+                "summary": summary_text,
+            }
+            used_themes.add(final_theme)
 
         for theme_name, summary_text in prev.items():
             if theme_name in used_themes:
                 continue
-            out[theme_name] = {"theme": theme_name, "summary": str(summary_text).strip()}
+            out[theme_name] = {
+                "theme": theme_name,
+                "summary": str(summary_text).strip(),
+            }
 
         return out
-
 
     def _build_graph(self):
         class State(dict):  # type: ignore

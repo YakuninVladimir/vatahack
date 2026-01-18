@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -41,6 +42,7 @@ def health() -> dict[str, bool]:
     return {"ok": True}
 
 
+'''
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest) -> dict[str, dict[str, str]]:
     try:
@@ -61,3 +63,30 @@ def analyze(req: AnalyzeRequest) -> dict[str, dict[str, str]]:
     except Exception as e:
         logger.exception("Analyze failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+'''
+
+
+@app.post("/analyze")
+async def analyze(req: AnalyzeRequest) -> dict[str, dict[str, str]]:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _analyze_sync, req)
+
+
+def _analyze_sync(req: AnalyzeRequest) -> dict[str, dict[str, str]]:
+    logger.info("Analyze request: messages=%s", len(req.messages))
+
+    messages = [Message(user=m.user, type=m.type, text=m.text) for m in req.messages]
+
+    extractor = ThemesExtractor(
+        min_topic_size=req.min_topic_size,
+        include_noise=req.include_noise,
+    )
+    grouped = extractor(messages)
+
+    builder = SummaryBuilder(
+        model=req.ollama_model,
+        context_window_tokens=req.context_window_tokens,
+        base_url=OLLAMA_BASE_URL,
+    )
+
+    return builder(grouped, previous_summary=req.previous_summary)
