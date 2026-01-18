@@ -35,3 +35,11 @@ SUMMARY_CONTEXT_WINDOW_TOKENS = _int_env("SUMMARY_CONTEXT_WINDOW_TOKENS", 4096)
 SUMMARY_AGENT_TIMEOUT_SECONDS = _int_env("SUMMARY_AGENT_TIMEOUT_SECONDS", 0)
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+# media services
+PHOTO_SERVICE_URL = os.getenv("PHOTO_SERVICE_URL", "http://photo-service:8002")
+SPEECH_SERVICE_URL = os.getenv("SPEECH_SERVICE_URL", "http://speech-service:8003")
+MEDIA_TIMEOUT_SECONDS = _int_env("MEDIA_TIMEOUT_SECONDS", 60)
+
+# OCR settings
+TESS_LANG = os.getenv("TESS_LANG", "rus+eng")

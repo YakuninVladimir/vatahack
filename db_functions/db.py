@@ -388,6 +388,30 @@ async def save_message(
             created_at
         )
 
+# db_functions/db.py
+
+async def update_message_text(chat_id: int, message_id: int, new_text: str):
+    """
+    Добавляет/обновляет распознанный текст у сообщения.
+    Если text пустой — ставим new_text, иначе дописываем с новой строки.
+    """
+    pool = _require_pool()
+    clean = (new_text or "").strip()
+    if not clean:
+        return
+
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            UPDATE messages
+            SET text = CASE
+                WHEN text IS NULL OR btrim(text) = '' THEN $3
+                ELSE text || E'\n' || $3
+            END
+            WHERE chat_id=$1 AND message_id=$2
+            """,
+            chat_id, message_id, clean
+        )
 
 
 if __name__ == "__main__":

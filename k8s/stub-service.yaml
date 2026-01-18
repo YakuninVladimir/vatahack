@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: stub-service
-          image: vatahack/stub-service:latest
+          image: stub-service:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8001

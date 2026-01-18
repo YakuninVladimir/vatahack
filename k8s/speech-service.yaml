@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speech-service
+  labels:
+    app: speech-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: speech-service
+  template:
+    metadata:
+      labels:
+        app: speech-service
+    spec:
+      containers:
+        - name: speech-service
+          image: speech-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8003
+          env:
+            - name: WHISPER_MODEL
+              value: "small"
+            - name: WHISPER_DEVICE
+              value: "cpu"
+            - name: WHISPER_COMPUTE
+              value: "int8"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: speech-service
+  labels:
+    app: speech-service
+spec:
+  selector:
+    app: speech-service
+  ports:
+    - name: http
+      port: 8003
+      targetPort: 8003
+  type: ClusterIP

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: bot
-          image: vatahack/client:latest
+          image: bot:local
           imagePullPolicy: IfNotPresent
           env:
             - name: TG_BOT_TOKEN
@@ -39,3 +39,9 @@ spec:
               value: "qwen2.5:1.5b-instruct"
             - name: LOG_LEVEL
               value: "INFO"
+            - name: PHOTO_SERVICE_URL
+              value: "http://photo-service:8002"
+            - name: SPEECH_SERVICE_URL
+              value: "http://speech-service:8003"
+
+

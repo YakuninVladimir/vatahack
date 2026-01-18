@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: photo-service
+  labels:
+    app: photo-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: photo-service
+  template:
+    metadata:
+      labels:
+        app: photo-service
+    spec:
+      containers:
+        - name: photo-service
+          image: photo-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8002
+          env:
+            - name: TESS_LANG
+              value: "rus+eng"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: photo-service
+  labels:
+    app: photo-service
+spec:
+  selector:
+    app: photo-service
+  ports:
+    - name: http
+      port: 8002
+      targetPort: 8002
+  type: ClusterIP
